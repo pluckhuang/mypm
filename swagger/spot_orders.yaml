@@ -1,0 +1,197 @@
+openapi: 3.0.0
+info:
+  title: Spot Data API
+  version: Gate API v4 v4.94.1
+  description: API for placing spot, margin, and leveraged orders
+servers:
+  - url: https://api.gateio.ws/api/v4
+paths:
+  /spot/orders:
+    post:
+      summary: 下单
+      description: |
+        支持现货、保证金、杠杆、全仓杠杆下单。通过 `account` 字段选择账户类型，默认为 `spot`（现货账户）。如果是统一账户（`unified`），默认使用统一账户下单。
+        **错误处理**：如果请求失败，请查看 [统一错误定义](https://www.gate.io/docs/developers/apiv4/zh_CN/#%E5%BC%82%E5%B8%B8-label-%E5%88%97%E8%A1%A8)。
+      security:
+        - ApiKeyAuth: []
+        - ApiTimestamp: []
+        - ApiSignature: []
+      parameters:
+        - name: x-gate-exptime
+          in: header
+          description: 指定过期时间（毫秒），若服务器时间超过此值，请求将被拒绝
+          required: false
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '201':
+          description: 交易成功执行，具体结果取决于 `time_in_force` 策略
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: KEY
+      description: APIv4 密钥对的 Key，在官网个人中心申请
+    ApiTimestamp:
+      type: apiKey
+      in: header
+      name: Timestamp
+      description: 请求发送时间（秒级 Unix 时间戳），与当前时间差距不得超过 60 秒
+    ApiSignature:
+      type: apiKey
+      in: header
+      name: SIGN
+      description: 使用 APIv4 Secret 加密签名字符串，算法为 HexEncode(HMAC_SHA512(secret, signature_string))
+  schemas:
+    OrderRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          description: |
+            订单自定义信息，必须以 `t-` 开头，长度（不含 `t-`）不超过 28 字节，仅限数字、字母、下划线(_)、中划线(-)、点(.)。
+            内部保留字段：`101` (Android), `102` (iOS), `103` (iPad), `104` (WebApp), `3` (Web), `2` (APIv2), `apiv4` (APIv4)。
+          example: "t-custom123"
+        currency_pair:
+          type: string
+          description: 交易货币对
+          example: "BTC_USDT"
+        type:
+          type: string
+          description: 订单类型
+          enum:
+            - limit
+            - market
+          default: "limit"
+        account:
+          type: string
+          description: 账户类型，`spot` - 现货账户，`margin` - 杠杆账户，`unified` - 统一账户
+          enum:
+            - spot
+            - margin
+            - unified
+          default: "spot"
+        side:
+          type: string
+          description: 买单或卖单
+          enum:
+            - buy
+            - sell
+        amount:
+          type: string
+          description: |
+            交易数量。
+            - `type=limit`：交易货币（如 BTC_USDT 中的 BTC）。
+            - `type=market`：`buy` 为计价货币（如 USDT），`sell` 为交易货币（如 BTC）。
+          example: "0.1"
+        price:
+          type: string
+          description: 交易价格，`type=limit` 时必填
+          example: "50000"
+        time_in_force:
+          type: string
+          description: |
+            Time in force 策略。
+            - `gtc`: GoodTillCancelled
+            - `ioc`: ImmediateOrCancelled
+            - `poc`: PendingOrCancelled
+            - `fok`: FillOrKill
+            `type=market` 时仅支持 `ioc` 和 `fok`。
+          enum:
+            - gtc
+            - ioc
+            - poc
+            - fok
+          default: "gtc"
+        iceberg:
+          type: string
+          description: 冰山下单显示数量，不指定或为 `0` 表示普通下单，不支持完全隐藏
+          example: "0.05"
+        auto_borrow:
+          type: boolean
+          description: 杠杆交易时（如 `account=margin` 或 `unified`），余额不足是否自动借入
+          default: false
+        auto_repay:
+          type: boolean
+          description: |
+            全仓杠杆下单（`account=unified`）是否自动还款，仅对当前委托生效。
+            逐仓杠杆通过 `/margin/auto_repay` 设置，不受此字段影响。
+          default: false
+        stp_act:
+          type: string
+          description: |
+            Self-Trading Prevention Action，限制自成交策略。
+            - `cn`: Cancel newest
+            - `co`: Cancel oldest
+            - `cb`: Cancel both
+            - `-`: 无策略（默认）。
+          enum:
+            - cn
+            - co
+            - cb
+            - "-"
+          default: "-"
+        action_mode:
+          type: string
+          description: |
+            处理模式，影响返回字段：
+            - `ACK`: 异步模式，仅返回关键字段
+            - `RESULT`: 无清算信息
+            - `FULL`: 完整模式（默认）
+          enum:
+            - ACK
+            - RESULT
+            - FULL
+          default: "FULL"
+      required:
+        - currency_pair
+        - side
+        - amount
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 订单 ID
+          example: "123456789"
+        currency_pair:
+          type: string
+          example: "BTC_USDT"
+        status:
+          type: string
+          description: 订单状态：`open` (挂单中), `closed` (全部成交), `cancelled` (已撤销)
+          enum:
+            - open
+            - closed
+            - cancelled
+        type:
+          type: string
+          example: "limit"
+        account:
+          type: string
+          example: "spot"
+        side:
+          type: string
+          example: "buy"
+        amount:
+          type: string
+          example: "0.1"
+        price:
+          type: string
+          example: "50000"
+      required:
+        - id
+        - currency_pair
+        - status

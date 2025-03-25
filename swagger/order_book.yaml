@@ -1,0 +1,98 @@
+openapi: 3.0.0
+info:
+  title: Spot Data API
+  version: Gate API v4 v4.94.1
+  description: API for retrieving Spot data
+
+servers:
+  - url: https://api.gateio.ws/api/v4
+
+paths:
+  /spot/order_book:
+    get:
+      summary: 获取市场深度数据
+      description: |
+        根据交易对返回市场深度信息，可选择合并精度、限制档位和返回更新 ID。
+        **错误处理**：如果请求失败，请查看 [统一错误定义](https://www.gate.io/docs/developers/apiv4/zh_CN/#%E5%BC%82%E5%B8%B8-label-%E5%88%97%E8%A1%A8)。
+      parameters:
+        - name: currency_pair
+          in: query
+          description: 交易对（如 BTC_USDT）
+          required: true
+          schema:
+            type: string
+          example: BTC_USDT
+        - name: interval
+          in: query
+          description: 合并深度指定的价格精度，0 为不合并，默认值为 0
+          required: false
+          schema:
+            type: string
+            default: "0"
+          example: "0"
+        - name: limit
+          in: query
+          description: 深度档位数量
+          required: false
+          schema:
+            type: integer
+          example: 10
+        - name: with_id
+          in: query
+          description: 是否返回深度更新 ID
+          required: false
+          schema:
+            type: boolean
+          example: true
+      responses:
+        '200':
+          description: 成功返回市场深度数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDepth'
+components:
+  schemas:
+    MarketDepth:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 深度更新 ID（仅当 with_id=true 时返回）
+          example: 123456
+        current:
+          type: integer
+          format: int64
+          description: 当前时间戳（毫秒）
+          example: 1623898993123
+        update:
+          type: integer
+          format: int64
+          description: 更新时间戳（毫秒）
+          example: 1623898993121
+        asks:
+          type: array
+          description: 卖单列表
+          items:
+            $ref: '#/components/schemas/PriceQuantityPair'
+        bids:
+          type: array
+          description: 买单列表
+          items:
+            $ref: '#/components/schemas/PriceQuantityPair'
+      required:
+        - current
+        - update
+        - asks
+        - bids
+    PriceQuantityPair:
+      type: array
+      description: 价格和数量对
+      minItems: 2
+      maxItems: 2
+      items:
+        type: string
+        description: 价格或数量（字符串表示）
+      example:
+        - "1.52"
+        - "1.151"
