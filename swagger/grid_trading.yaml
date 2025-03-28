@@ -1,0 +1,261 @@
+openapi: 3.0.0
+info:
+  title: Grid Trading Strategy API
+  description: API for creating, querying, and stopping static grid trading strategies on the spot market. All endpoints require message authentication via request headers.
+  version: 1.0.0
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication.
+    TimestampAuth:
+      type: apiKey
+      in: header
+      name: X-Timestamp
+      description: Unix timestamp (seconds) for request validation.
+    SignatureAuth:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: HMAC signature for message authentication.
+
+  schemas:
+    CreateGridRequest:
+      type: object
+      required:
+        - symbol
+        - lower_price
+        - upper_price
+        - grid_count
+        - amount_per_grid
+      properties:
+        symbol:
+          type: string
+          description: Trading pair (e.g., BTC/USDT).
+          example: "BTC/USDT"
+        lower_price:
+          type: number
+          format: float
+          description: Lower price boundary of the grid.
+          example: 55000.0
+        upper_price:
+          type: number
+          format: float
+          description: Upper price boundary of the grid.
+          example: 65000.0
+        grid_count:
+          type: integer
+          description: Number of grid levels.
+          example: 10
+        amount_per_grid:
+          type: number
+          format: float
+          description: Amount to trade per grid level (in base currency, e.g., BTC).
+          example: 0.001
+
+    CreateGridResponse:
+      type: object
+      required:
+        - strategy_id
+        - created_at
+      properties:
+        strategy_id:
+          type: string
+          description: Unique identifier of the grid strategy.
+          example: "grid_12345"
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp (ISO 8601).
+          example: "2025-03-27T10:00:00Z"
+
+    GridStatusResponse:
+      type: object
+      required:
+        - strategy_id
+        - symbol
+        - status
+        - grids
+        - profit
+        - updated_at
+      properties:
+        strategy_id:
+          type: string
+          example: "grid_12345"
+        symbol:
+          type: string
+          example: "BTC/USDT"
+        status:
+          type: string
+          enum: [running, stopped]
+          example: "running"
+        grids:
+          type: object
+          properties:
+            buy:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  held:
+                    type: boolean
+                example:
+                  { "55000": { "held": true }, "56000": { "held": false } }
+            sell:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  held:
+                    type: boolean
+                example:
+                  { "56000": { "held": false }, "57000": { "held": true } }
+        profit:
+          type: number
+          format: float
+          description: Total profit in quote currency (e.g., USDT).
+          example: 75.50
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-03-27T12:00:00Z"
+
+    StopGridResponse:
+      type: object
+      required:
+        - strategy_id
+        - status
+      properties:
+        strategy_id:
+          type: string
+          example: "grid_12345"
+        status:
+          type: string
+          enum: [stopped]
+          example: "stopped"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "INVALID_PARAM"
+        message:
+          type: string
+          example: "Lower price must be less than upper price"
+
+paths:
+  /spot/grid/strategies:
+    post:
+      summary: Create a Grid Strategy
+      description: Creates a static grid trading strategy with specified trading pair, price range, and grid count.
+      operationId: createGridStrategy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGridRequest"
+      responses:
+        "201":
+          description: Strategy created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateGridResponse"
+        "400":
+          description: Invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - ApiKeyAuth: []
+          TimestampAuth: []
+          SignatureAuth: []
+
+  /grid/strategies/{strategy_id}:
+    get:
+      summary: Query Grid Strategy Status
+      description: Retrieves the status, grid execution, and profit of a specific grid strategy.
+      operationId: getGridStrategyStatus
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "grid_12345"
+          description: Unique identifier of the grid strategy.
+      responses:
+        "200":
+          description: Strategy status retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GridStatusResponse"
+        "404":
+          description: Strategy not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - ApiKeyAuth: []
+          TimestampAuth: []
+          SignatureAuth: []
+
+    delete:
+      summary: Stop a Grid Strategy
+      description: Stops a grid strategy and cancels all unexecuted orders.
+      operationId: stopGridStrategy
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "grid_12345"
+          description: Unique identifier of the grid strategy.
+      responses:
+        "200":
+          description: Strategy stopped successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StopGridResponse"
+        "404":
+          description: Strategy not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - ApiKeyAuth: []
+          TimestampAuth: []
+          SignatureAuth: []
