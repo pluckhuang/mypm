@@ -346,7 +346,6 @@ print(response.json())
 3. **状态更新**：
    - 成功：`buy_grids[58000]["held"] = True`，记录 `order_id`。
    - 失败：保持 `held = False`，回滚任何临时状态。
-   - 提交数据库（PostgreSQL）。
 
 4. **补挂卖单**：
    - 计算 `sell_price = buy_price + step`（如 58000 + 1000 = 59000）。
@@ -354,7 +353,6 @@ print(response.json())
    - **异常处理**：
      - 成功：`sell_grids[59000]["held"] = True`。
      - 失败：回滚买入状态（`buy_grids[58000]["held"] = False`），取消买单。
-   - 提交数据库。
 ```
 
 ### 9.3 接口文档标准
