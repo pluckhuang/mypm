@@ -192,7 +192,7 @@ Response (200 OK):
   - 买入网格表示是否持有订单, 卖出网格表示是否有卖单等待卖出。
 
 #### 4.2.2 实时价格监控
-- **数据源** 比如内部服务 WebSocket（`wss://api.gateio.ws/ws/v4/`）。
+- **数据源** 比如服务 [WebSocket](./realtime_price.py)（`wss://api.gateio.ws/ws/v4/`）。
 - **逻辑**：
   - 获取最新价格（如 59800）。
   - 检查触发条件。
